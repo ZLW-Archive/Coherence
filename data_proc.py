@@ -112,6 +112,7 @@ build_word_vector_matrix(glove_path, word_vector_matrix)
 np.save(r"data/word_vector_matrix.npy", word_vector_matrix)
 for t in data_type:
     print("Start to save type: {}".format(t))
+    save_file[t].write("{}\n".format(len(paragraph_list[t])))
     for i, para in enumerate(paragraph_list[t]):
         if i % 500 == 0:
             print("{}: finish para {}".format(t, i))

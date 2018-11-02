@@ -1,11 +1,11 @@
 import numpy as np
-from data_proc.data_proc import read_proc_data
+from data_proc.read_proc_data import read_proc_data
 from train_prepare import CoDataSet
 from torch.utils.data import DataLoader
 
 # parameter
 epoch_num = 50
-batch_size = 0
+batch_size = 1
 embedding_dim = 300
 dropout_rate = 0.8
 
@@ -16,9 +16,9 @@ paragraph_list = {
     "test": read_proc_data("test")
 }
 paragraph_dataset = {
-    "train": CoDataSet(paragraph_list["train"]),
-    "valid": CoDataSet(paragraph_list["valid"]),
-    "test": CoDataSet(paragraph_list["test"])
+    "train": CoDataSet(paragraph_list["train"], "train"),
+    "valid": CoDataSet(paragraph_list["valid"], "valid"),
+    "test": CoDataSet(paragraph_list["test"], "test")
 }
 paragraph_loader = {
     "train": DataLoader(dataset=paragraph_dataset["train"],
@@ -30,11 +30,12 @@ paragraph_loader = {
                         shuffle=False,
                         drop_last=False),
     "test": DataLoader(dataset=paragraph_dataset["test"],
-                        batch_size=batch_size,
-                        shuffle=False,
-                        drop_last=False),
+                       batch_size=batch_size,
+                       shuffle=False,
+                       drop_last=False),
 }
 
 word_vector_matrix = np.load("data/word_vector_matrix.npy")
 
-
+for x in paragraph_loader["train"]:
+    pass

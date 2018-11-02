@@ -1,6 +1,7 @@
 import torch
+from tqdm import tqdm
 from torch.utils.data import Dataset
-from data_proc.data_proc import Paragraph
+from data_proc.read_proc_data import Paragraph
 
 class Sentence:
     def __init__(self, seq):
@@ -14,7 +15,7 @@ class Sentence:
         self.pos_seq = torch.cat([self.pos_seq, tmp], 0)
 
 class CoDataSet(Dataset):
-    def __init__(self, para_list):
+    def __init__(self, para_list, source):
         assert isinstance(para_list, list)
         assert isinstance(para_list[0], Paragraph)
 
@@ -23,14 +24,15 @@ class CoDataSet(Dataset):
         self.paragraph_tag_list = [para.tag for para in para_list]
         self.paragraph_sentence_length_list = [[len(sent) for sent in para.sentence_list] for para in para_list]
 
-        for para in para_list:
+        for i in tqdm(range(self.paragraph_num), desc="{} dataset".format(source)):
+            para = para_list[i]
             assert isinstance(para, Paragraph)
             max_sentence_length = max([len(sent) for sent in para.sentence_list])
-            for i, sent in enumerate(para.sentence_list):
+            for j, sent in enumerate(para.sentence_list):
                 tmp = torch.zeros(max_sentence_length - len(sent)).long()
                 sent_tensor = torch.cat([torch.Tensor(sent).long(), tmp], 0)
 
-                if i == 0:
+                if j == 0:
                     para_tensor = sent_tensor.view(1, -1)
                 else:
                     para_tensor = torch.cat([para_tensor, sent_tensor.view(1, -1)])

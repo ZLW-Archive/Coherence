@@ -1,3 +1,5 @@
+from tqdm import tqdm
+
 class Paragraph:
     def __init__(self, source, tag):
         self.source = source
@@ -11,8 +13,8 @@ def read_proc_data(source):
 
     para_list = []
 
-    for _ in range(para_num):
-        tag = file.readline()
+    for _ in tqdm(range(para_num), desc="{} reading".format(source)):
+        tag = int(file.readline())
         sent_num = int(file.readline())
         para_obj = Paragraph(source, tag)
         for _ in range(sent_num):

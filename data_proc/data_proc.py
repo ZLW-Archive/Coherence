@@ -1,7 +1,7 @@
 import re
 import nltk
 import numpy as np
-from text_proc import utterance_process
+from data_proc.text_proc import utterance_process
 
 data_path = r"data/"
 data_type = ["train", "valid", "test"]

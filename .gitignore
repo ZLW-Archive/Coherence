@@ -1,8 +1,10 @@
 *.idea
 *.pyc
 *.txt
+*.zip
 .idea/
 data/
+data_ori/
 checkpoint/
 result/
 old/

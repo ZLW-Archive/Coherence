@@ -5,9 +5,11 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from model.Attention import ScaledDotProductAttentionBatch
 
+MAX_SENTENCE_NUM_IN_PARAGRAPH = 57
+
 class SentenceEncoder(nn.Module):
     def __init__(self, embedding_dim, hidden_dim, vocab_size, word_vec_matrix,
-                 attention_op="self"):
+                 attention_op="none"):
         super(SentenceEncoder, self).__init__()
         self.adj_attention_op = attention_op
 
@@ -117,9 +119,11 @@ class ParagraphEncoder(nn.Module):
         :return: attention_out: torch tensor; shape=(sent_num, embedding_dimx4=1200)
         """
         sentence_encoder_out = self.sentence_encoder(paragraph, sentence_length_list)
-        sentence_lstm_out, _ = self.sentence_lstm(sentence_encoder_out.view(1, sentence_encoder_out.shape[0], -1))
+        rest = MAX_SENTENCE_NUM_IN_PARAGRAPH % sentence_encoder_out.shape[0]
+        sentence_encoder_out = nn.ZeroPad2d((0, 0, 0, rest))(sentence_encoder_out)
 
-        return sentence_lstm_out.view(sentence_lstm_out.shape[1], sentence_lstm_out.shape[2])
+        # sentence_lstm_out, _ = self.sentence_lstm(sentence_encoder_out.view(1, sentence_encoder_out.shape[0], -1))
+        # return sentence_lstm_out.view(sentence_lstm_out.shape[1], sentence_lstm_out.shape[2])
 
         # attention_out = self.attention_layer(sentence_lstm_out, sentence_lstm_out, sentence_lstm_out)\
         #     .view(sentence_lstm_out.shape[1], -1)
@@ -155,8 +159,6 @@ class ParagraphBatchProcessor(nn.Module):
         assert self.batch_size == len(sentence_length_list_batch)
         paragraph_encoder_out_batch = [self.paragraph_encoder(para, sent_len_list)
                                        for para, sent_len_list in zip(paragraph_batch, sentence_length_list_batch)]
-
-        paragraph_sentence_length_max = max([para_enc_out.shape[0] for para_enc_out in paragraph_encoder_out_batch])
 
         # paragraph_vector_batch = [torch.max(para_enc_out, 0)[0] for para_enc_out in paragraph_encoder_out_batch]
         paragraph_vector_batch = [para_enc_out[-1] for para_enc_out in paragraph_encoder_out_batch]

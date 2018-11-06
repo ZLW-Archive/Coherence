@@ -4,6 +4,8 @@ from tqdm import tqdm
 from torch.utils.data import Dataset
 from data_proc.read_proc_data import Paragraph
 
+MAX_SENTENCE_NUM_IN_PARAGRAPH = 57
+
 class Sentence:
     def __init__(self, seq):
         self.seq = seq
@@ -24,8 +26,13 @@ class CoDataSet(Dataset):
         self.paragraph_tag_num = [0, 0]
         self.paragraph_tensor_list = []
         self.paragraph_tag_list = [para.tag for para in para_list]
-        self.paragraph_sentence_length_list = [torch.Tensor([len(sent) for sent in para.sentence_list]).int()
-                                               for para in para_list]
+
+        self.paragraph_sentence_length_list = \
+            [torch.Tensor([len(sent) for sent in para.sentence_list]
+                          * (MAX_SENTENCE_NUM_IN_PARAGRAPH // len(para.sentence_list))
+                          # + [0 for _ in range(MAX_SENTENCE_NUM_IN_PARAGRAPH % len(para.sentence_list))]
+                          ).int()
+             for para in para_list]
 
         for i in tqdm(range(self.paragraph_num), desc="{} dataset".format(source)):
             para = para_list[i]
@@ -42,6 +49,15 @@ class CoDataSet(Dataset):
                     para_tensor = sent_tensor.view(1, -1)
                 else:
                     para_tensor = torch.cat([para_tensor, sent_tensor.view(1, -1)])
+
+            # proc extend
+            extend_times = MAX_SENTENCE_NUM_IN_PARAGRAPH // para_tensor.shape[0]
+            rest_space = MAX_SENTENCE_NUM_IN_PARAGRAPH % para_tensor.shape[0]
+            para_tensor_buff = para_tensor
+            for _ in range(extend_times - 1):
+                para_tensor = torch.cat([para_tensor, para_tensor_buff], 0)
+
+            # para_tensor = torch.cat([para_tensor, torch.zeros([rest_space, para_tensor.shape[1]]).long()], 0)
 
             self.paragraph_tensor_list.append(para_tensor)
 

@@ -44,6 +44,11 @@ class SentenceEncoder(nn.Module):
         # unsort
         lstm_out = lstm_out[desorted_indices]
 
+        avg_k = lstm_out.shape[1]
+        avg_pooling_out = torch.sum(lstm_out, 1) / avg_k
+
+        return avg_pooling_out
+
         # # self attention
         # self_attention_out = self.attention_layer(lstm_out, lstm_out, lstm_out)
         #
@@ -60,11 +65,11 @@ class SentenceEncoder(nn.Module):
         # after_attention_out = torch.cat([after_attention_out, zero_append])
         # before_attention_out = torch.cat([zero_append, before_attention_out])
 
-        # output
-        if self.adj_attention_op == "none":
-            max_pooling_out = torch.max(lstm_out, 1)[0]
-            return max_pooling_out
-
+        # # output
+        # if self.adj_attention_op == "none":
+        #     max_pooling_out = torch.max(lstm_out, 1)[0]
+        #     return max_pooling_out
+        #
         # elif self.adj_attention_op == "self":
         #     max_pooling_out = torch.max(self_attention_out, 1)[0]
         #     return max_pooling_out
@@ -87,7 +92,7 @@ class SentenceEncoder(nn.Module):
 
 class ParagraphEncoder(nn.Module):
     def __init__(self, embedding_dim, hidden_dim, vocab_size, word_vec_matrix,
-                 attention_op="self"):
+                 attention_op="none"):
         super(ParagraphEncoder, self).__init__()
 
         self.sentence_encoder = SentenceEncoder(embedding_dim=embedding_dim,
@@ -106,7 +111,20 @@ class ParagraphEncoder(nn.Module):
         self.sentence_lstm = nn.LSTM(input_size=sentence_encoder_dim, hidden_size=hidden_dim*2,
                                      bidirectional=True, batch_first=True)
 
+        self.qa_score_linear = nn.Sequential(
+            nn.Linear(sentence_encoder_dim * 4, 100),
+            nn.ReLU(),
+            nn.Linear(100, 1)
+        )
+
         # self.attention_layer = ScaledDotProductAttentionBatch(model_dim=sentence_encoder_dim)
+
+    def question_answer_score(self, question_tensor, answer_tensor):
+        abs_part = torch.abs(question_tensor - answer_tensor)
+        multiply_part = question_tensor * answer_tensor
+        cat_tensor = torch.cat([question_tensor, answer_tensor, abs_part, multiply_part], 0)
+        score = self.qa_score_linear(cat_tensor)
+        return score
 
     def forward(self, paragraph, sentence_length_list):
         """
@@ -122,6 +140,12 @@ class ParagraphEncoder(nn.Module):
         rest = MAX_SENTENCE_NUM_IN_PARAGRAPH % sentence_encoder_out.shape[0]
         sentence_encoder_out = nn.ZeroPad2d((0, 0, 0, rest))(sentence_encoder_out)
 
+        sentence_num = sentence_encoder_out.shape[0]
+        similarity_list = [self.question_answer_score(sentence_encoder_out[i], sentence_encoder_out[i+1])
+                           for i in range(sentence_num-1)]
+
+        return torch.cat(similarity_list).view(1, -1)
+
         # sentence_lstm_out, _ = self.sentence_lstm(sentence_encoder_out.view(1, sentence_encoder_out.shape[0], -1))
         # return sentence_lstm_out.view(sentence_lstm_out.shape[1], sentence_lstm_out.shape[2])
 
@@ -130,10 +154,9 @@ class ParagraphEncoder(nn.Module):
         #
         # return attention_out
 
-
 class ParagraphBatchProcessor(nn.Module):
     def __init__(self, embedding_dim, hidden_dim, fc_dim, vocab_size, tagset_size, word_vec_matrix, dropout,
-                 batch_size, attention_op="self"):
+                 batch_size, attention_op="none"):
         super(ParagraphBatchProcessor, self).__init__()
         self.batch_size = batch_size
         self.paragraph_encoder = ParagraphEncoder(embedding_dim=embedding_dim,
@@ -142,7 +165,7 @@ class ParagraphBatchProcessor(nn.Module):
                                                   word_vec_matrix=word_vec_matrix,
                                                   attention_op=attention_op)
 
-        self.paragraph_vector_dim = embedding_dim*4
+        self.paragraph_vector_dim = MAX_SENTENCE_NUM_IN_PARAGRAPH-1 # embedding_dim*4
 
         self.classifier = nn.Sequential(
             nn.Linear(self.paragraph_vector_dim, fc_dim),
@@ -160,13 +183,15 @@ class ParagraphBatchProcessor(nn.Module):
         paragraph_encoder_out_batch = [self.paragraph_encoder(para, sent_len_list)
                                        for para, sent_len_list in zip(paragraph_batch, sentence_length_list_batch)]
 
-        # paragraph_vector_batch = [torch.max(para_enc_out, 0)[0] for para_enc_out in paragraph_encoder_out_batch]
-        paragraph_vector_batch = [para_enc_out[-1] for para_enc_out in paragraph_encoder_out_batch]
+        # # paragraph_vector_batch = [torch.max(para_enc_out, 0)[0] for para_enc_out in paragraph_encoder_out_batch]
+        # paragraph_vector_batch = [para_enc_out[-1] for para_enc_out in paragraph_encoder_out_batch]
+        #
+        # paragraph_tensor_matrix = paragraph_vector_batch[0].view(1, paragraph_vector_batch[0].shape[0])
+        # for i in range(1, self.batch_size):
+        #     paragraph_vector = paragraph_vector_batch[i].view(1, paragraph_vector_batch[i].shape[0])
+        #     paragraph_tensor_matrix = torch.cat([paragraph_tensor_matrix, paragraph_vector])
 
-        paragraph_tensor_matrix = paragraph_vector_batch[0].view(1, paragraph_vector_batch[0].shape[0])
-        for i in range(1, self.batch_size):
-            paragraph_vector = paragraph_vector_batch[i].view(1, paragraph_vector_batch[i].shape[0])
-            paragraph_tensor_matrix = torch.cat([paragraph_tensor_matrix, paragraph_vector])
+        paragraph_tensor_matrix = torch.cat(paragraph_encoder_out_batch, 0)
 
         score_batch = self.classifier(paragraph_tensor_matrix)
 

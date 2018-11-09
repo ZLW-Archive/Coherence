@@ -9,7 +9,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 # parameter
-epoch_num = 50
+epoch_num = 100
 batch_size = 50
 embedding_dim = 300
 hidden_dim = 300
@@ -19,12 +19,12 @@ dropout_rate = 0.3
 # <editor-fold desc="data preparation">
 paragraph_list = {
     "train": read_proc_data("train"),
-    "valid": read_proc_data("valid"),
+    # "valid": read_proc_data("valid"),
     # "test": read_proc_data("test")
 }
 paragraph_dataset = {
-    "train": CoDataSet(paragraph_list["train"], "train"),
-    "valid": CoDataSet(paragraph_list["valid"], "valid"),
+    "train": CoDataSet(paragraph_list["train"][:1000], "train"),
+    # "valid": CoDataSet(paragraph_list["valid"], "valid"),
     # "test": CoDataSet(paragraph_list["test"], "test")
 }
 # </editor-fold>
@@ -46,7 +46,7 @@ model = ParagraphBatchProcessor(embedding_dim=embedding_dim,
 
 print(model)
 
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.1)
 loss_func = nn.CrossEntropyLoss(reduce=True, size_average=True)
 
 def train():
@@ -60,21 +60,25 @@ def train():
 
     for batch_times, (paragraph_batch, sentence_length_batch, tag_batch) \
             in enumerate(paragraph_dataset["train"].loader(batch_size)):
+
+        optimizer.zero_grad()
+
         score_batch = model(paragraph_batch, sentence_length_batch)
         predict = torch.max(score_batch, 1)[1]
 
         loss = loss_func(score_batch, tag_batch)
         total_loss += loss*batch_size
 
-        optimizer.zero_grad()
         loss.backward()
+        optimizer.step()
 
         for i in range(batch_size):
             if predict[i] == tag_batch[i]:
                 correct_predict[tag_batch[i]] += 1
 
         if (batch_times + 1)*batch_size % 2000 == 0:
-            print("{} Paragraph Finish ... loss now: {:.5f}".format((batch_times + 1)*batch_size, loss))
+            print("{} Paragraph Finish ... loss now: {:.5f} Correct Now: Co: {} Un: {}"
+                  .format((batch_times + 1)*batch_size, loss, correct_predict[1], correct_predict[0]))
 
     return correct_predict, total_loss
 
@@ -107,8 +111,8 @@ def evaluate(tag):
 def print_info(tag, correct_predict, total_loss):
     print("{}: CO: {}/{}; UN: {}/{}".format(tag, correct_predict[1], paragraph_dataset[tag].paragraph_tag_num[1],
                                             correct_predict[0], paragraph_dataset[tag].paragraph_tag_num[0]))
-    print("{}: ACC: {:.5}".format(tag, (correct_predict[0]+correct_predict[1])/len(paragraph_dataset[tag])))
-    print("{}: LOSS: {:.5}".format(tag, total_loss))
+    print("{}: ACC: {:.5f}".format(tag, (correct_predict[0]+correct_predict[1])/len(paragraph_dataset[tag])))
+    print("{}: LOSS: {:.5f}".format(tag, total_loss/paragraph_dataset[tag].paragraph_num))
 
 for epoch in range(epoch_num):
     train_correct_predict, train_total_loss = train()

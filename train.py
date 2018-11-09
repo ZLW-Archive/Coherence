@@ -46,7 +46,7 @@ model = ParagraphBatchProcessor(embedding_dim=embedding_dim,
 
 print(model)
 
-optimizer = optim.Adam(model.parameters(), lr=0.01)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 loss_func = nn.CrossEntropyLoss(reduce=True, size_average=True)
 
 def train():

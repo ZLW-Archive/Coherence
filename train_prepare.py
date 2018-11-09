@@ -6,6 +6,7 @@ from data_proc.read_proc_data import Paragraph
 
 MAX_SENTENCE_NUM_IN_PARAGRAPH = 57
 
+
 class Sentence:
     def __init__(self, seq):
         self.seq = seq
@@ -16,6 +17,7 @@ class Sentence:
         tmp = torch.zeros(total_length - self.seq_len).long()
         self.seq = torch.cat([self.seq, tmp], 0)
         self.pos_seq = torch.cat([self.pos_seq, tmp], 0)
+
 
 class CoDataSet(Dataset):
     def __init__(self, para_list, source, shuffle=False):
@@ -64,10 +66,11 @@ class CoDataSet(Dataset):
         self.make_cuda()
 
         if shuffle:
-            idx = random.sample(range(self.paragraph_num), self.paragraph_num)
-            self.paragraph_tensor_list = self.paragraph_tensor_list[idx]
-            self.paragraph_tag_list = self.paragraph_tag_list[idx]
-            self.paragraph_sentence_length_list = self.paragraph_sentence_length_list[idx]
+            ZIP_LIST = list(zip(self.paragraph_tensor_list,
+                                self.paragraph_tag_list,
+                                self.paragraph_sentence_length_list))
+            random.Random().shuffle(ZIP_LIST)
+            self.paragraph_tensor_list, self.paragraph_tag_list, self.paragraph_sentence_length_list = zip(*ZIP_LIST)
 
     def make_cuda(self):
         for i in range(self.paragraph_num):
@@ -87,6 +90,6 @@ class CoDataSet(Dataset):
         rest = self.paragraph_num % batch_size
 
         for i in range(times):
-            yield self.paragraph_tensor_list[i*(batch_size): (i+1)*batch_size], \
-                  self.paragraph_sentence_length_list[i*(batch_size): (i+1)*batch_size], \
-                  torch.Tensor(self.paragraph_tag_list[i*(batch_size): (i+1)*batch_size]).long().cuda()
+            yield self.paragraph_tensor_list[i * (batch_size): (i + 1) * batch_size], \
+                  self.paragraph_sentence_length_list[i * (batch_size): (i + 1) * batch_size], \
+                  torch.Tensor(self.paragraph_tag_list[i * (batch_size): (i + 1) * batch_size]).long().cuda()

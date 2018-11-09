@@ -176,9 +176,8 @@ def SKIPFLOW(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
 
-
 earlystopping = EarlyStopping(monitor='val_loss', patience=10)
-sf_1 = SKIPFLOW(lstm_dim=50, lr=2e-4, lr_decay=2e-6, k=4, eta=13, delta=50, activation="relu", seed=None)
+model = SKIPFLOW(lstm_dim=50, lr=2e-3, lr_decay=2e-6, k=4, eta=13, delta=50, activation="relu", seed=None)
 
 # hist = sf_1.fit(paragraph_dataset["train"][0], paragraph_dataset["train"][1], batch_size=1000, epochs=epochs,
 #                 validation_data=(paragraph_dataset["valid"][0], paragraph_dataset["valid"][1]),
@@ -187,7 +186,9 @@ sf_1 = SKIPFLOW(lstm_dim=50, lr=2e-4, lr_decay=2e-6, k=4, eta=13, delta=50, acti
 # # fit_generator(self, generator, steps_per_epoch, epochs=1, verbose=1, callbacks=None, validation_data=None,
 # #               validation_steps=None, class_weight=None, max_q_size=10, workers=1, pickle_safe=False, initial_epoch=0)
 
-hist = sf_1.fit_generator(paragraph_loader["train"], steps_per_epoch=paragraph_num["train"] // BATCH_SIZE,
-                          epochs=EPOCH, verbose=1, callbacks=[earlystopping],
-                          validation_data=paragraph_loader["valid"],
-                          validation_steps=paragraph_num["valid"] // BATCH_SIZE)
+model.fit_generator(paragraph_loader["train"], steps_per_epoch=paragraph_num["train"] // BATCH_SIZE,
+                    epochs=EPOCH, verbose=2, callbacks=[earlystopping],
+                    validation_data=paragraph_loader["valid"],
+                    validation_steps=paragraph_num["valid"] // BATCH_SIZE)
+
+model.save("saved_model.h5")

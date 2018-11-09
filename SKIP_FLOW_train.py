@@ -1,24 +1,14 @@
-import random
-
-import keras.layers  as  klayers
-from keras.preprocessing.text import text_to_word_sequence
-from keras.preprocessing.sequence import pad_sequences
-from keras.layers import Dense, LSTM, Input, Embedding, GlobalAveragePooling1D, Concatenate, Activation, Lambda, \
-    BatchNormalization, Convolution1D, Dropout
-from keras.models import Model
+import numpy as np
 from keras import backend as K
-from keras.engine.topology import Layer, InputSpec
-from keras.optimizers import Adam
-from keras.callbacks import EarlyStopping
-from keras import regularizers
 from keras import initializers
+from keras.callbacks import EarlyStopping
+from keras.engine.topology import Layer, InputSpec
+from keras.layers import Dense, LSTM, Input, Embedding, Concatenate, Lambda
+from keras.models import Model
+from keras.optimizers import Adam
+from keras.preprocessing.sequence import pad_sequences
 from keras.utils import np_utils
 from scipy import stats
-from keras.preprocessing.text import Tokenizer
-import numpy as np
-from gensim.models import Word2Vec, doc2vec
-import nltk
-from sklearn.metrics import cohen_kappa_score
 
 from data_proc.read_proc_data import read_proc_data
 
@@ -26,8 +16,10 @@ from data_proc.read_proc_data import read_proc_data
 EMBEDDING_DIM = 300
 MAX_NB_WORDS = 4000
 MAX_SEQUENCE_LENGTH = 500
-VALIDATION_SPLIT = 0.20
 DELTA = 20
+
+BATCH_SIZE = 100
+EPOCH = 1000
 
 
 class NeuralTensorLayer(Layer):
@@ -99,10 +91,14 @@ class TemporalMeanPooling(Layer):  # conversion from (samples,timesteps,features
 
 paragraph_list = {
     "train": read_proc_data("train", para_wise=True, sample=10000),
-    "valid": read_proc_data("valid", para_wise=True, sample=100),
+    "valid": read_proc_data("valid", para_wise=True),
     # "test": read_proc_data("test")
 }
 
+paragraph_num = {
+    "train": len(paragraph_list["train"]),
+    "valid": len(paragraph_list["valid"]),
+}
 
 def get_dataset(tag, shuffle=False):
     sequence = [para["paragraph"] for para in paragraph_list[tag]]
@@ -112,7 +108,7 @@ def get_dataset(tag, shuffle=False):
     tag_list = np_utils.to_categorical(tag_list)
 
     if shuffle:
-        idx = np.arange(len(paragraph_list[tag]))
+        idx = np.arange(paragraph_num[tag])
         np.random.shuffle(idx)
         sequence = sequence[idx]
         tag_list = tag_list[idx]
@@ -120,10 +116,24 @@ def get_dataset(tag, shuffle=False):
     return sequence, tag_list
 
 
+def get_generator(tag, batch_size):
+    para_num = paragraph_num[tag]
+    while True:
+        times = para_num // batch_size
+        for i in range(times):
+            yield paragraph_dataset[tag][0][i * (batch_size): (i + 1) * batch_size], \
+                  paragraph_dataset[tag][1][i * (batch_size): (i + 1) * batch_size]
+
+
 paragraph_dataset = {
     "train": get_dataset("train", shuffle=True),
-    "valid": get_dataset("valid"),
+    "valid": get_dataset("valid", shuffle=True),
     # "test": get_dataset("test")
+}
+
+paragraph_loader = {
+    "train": get_generator("train", BATCH_SIZE),
+    "valid": get_generator("valid", BATCH_SIZE)
 }
 
 embedding_matrix = np.load("data/word_vector_matrix.npy")
@@ -170,7 +180,14 @@ def SKIPFLOW(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
 earlystopping = EarlyStopping(monitor='val_loss', patience=10)
 sf_1 = SKIPFLOW(lstm_dim=50, lr=2e-4, lr_decay=2e-6, k=4, eta=13, delta=50, activation="relu", seed=None)
 
-epochs = 1000
-hist = sf_1.fit(paragraph_dataset["train"][0], paragraph_dataset["train"][1], batch_size=1000, epochs=epochs,
-                validation_data=(paragraph_dataset["valid"][0], paragraph_dataset["valid"][1]), callbacks=[earlystopping])
+# hist = sf_1.fit(paragraph_dataset["train"][0], paragraph_dataset["train"][1], batch_size=1000, epochs=epochs,
+#                 validation_data=(paragraph_dataset["valid"][0], paragraph_dataset["valid"][1]),
+#                 callbacks=[earlystopping])
+#
+# # fit_generator(self, generator, steps_per_epoch, epochs=1, verbose=1, callbacks=None, validation_data=None,
+# #               validation_steps=None, class_weight=None, max_q_size=10, workers=1, pickle_safe=False, initial_epoch=0)
 
+hist = sf_1.fit_generator(paragraph_loader["train"], steps_per_epoch=paragraph_num["train"] // BATCH_SIZE,
+                          epochs=EPOCH, verbose=1, callbacks=[earlystopping],
+                          validation_data=paragraph_loader["valid"],
+                          validation_steps=paragraph_num["valid"] // BATCH_SIZE)

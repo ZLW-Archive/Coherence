@@ -115,14 +115,8 @@ class ParagraphEncoder(nn.Module):
         :return: attention_out: torch tensor; shape=(sent_num, embedding_dimx4=1200)
         """
         sentence_encoder_out = self.sentence_encoder(paragraph, sentence_length_list)
-        sentence_lstm_out, _ = self.sentence_lstm(sentence_encoder_out.view(1, sentence_encoder_out.shape[0], -1))
 
-        return sentence_lstm_out.view(sentence_lstm_out.shape[1], sentence_lstm_out.shape[2])
 
-        # attention_out = self.attention_layer(sentence_lstm_out, sentence_lstm_out, sentence_lstm_out)\
-        #     .view(sentence_lstm_out.shape[1], -1)
-        #
-        # return attention_out
 
 
 class ParagraphBatchProcessor(nn.Module):

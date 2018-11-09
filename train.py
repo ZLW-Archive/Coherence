@@ -23,8 +23,8 @@ paragraph_list = {
     # "test": read_proc_data("test")
 }
 paragraph_dataset = {
-    "train": CoDataSet(paragraph_list["train"][:1000], "train"),
-    # "valid": CoDataSet(paragraph_list["valid"], "valid"),
+    "train": CoDataSet(paragraph_list["train"], "train"),
+    # "valid": CoDataSet(paragraph_list["valid"][:1000], "valid"),
     # "test": CoDataSet(paragraph_list["test"], "test")
 }
 # </editor-fold>
@@ -46,7 +46,7 @@ model = ParagraphBatchProcessor(embedding_dim=embedding_dim,
 
 print(model)
 
-optimizer = optim.Adam(model.parameters(), lr=0.1)
+optimizer = optim.Adam(model.parameters(), lr=0.01)
 loss_func = nn.CrossEntropyLoss(reduce=True, size_average=True)
 
 def train():
@@ -111,14 +111,15 @@ def evaluate(tag):
 def print_info(tag, correct_predict, total_loss):
     print("{}: CO: {}/{}; UN: {}/{}".format(tag, correct_predict[1], paragraph_dataset[tag].paragraph_tag_num[1],
                                             correct_predict[0], paragraph_dataset[tag].paragraph_tag_num[0]))
-    print("{}: ACC: {:.5f}".format(tag, (correct_predict[0]+correct_predict[1])/len(paragraph_dataset[tag])))
+    print("{}: ACC: {:.5f}".format(tag, (correct_predict[0]+correct_predict[1])/paragraph_dataset[tag].paragraph_num))
     print("{}: LOSS: {:.5f}".format(tag, total_loss/paragraph_dataset[tag].paragraph_num))
 
 for epoch in range(epoch_num):
     train_correct_predict, train_total_loss = train()
-    # evaluate_correct_predict, evaluate_total_loss = evaluate("valid")
-
     print_info("train", train_correct_predict, train_total_loss)
-    # print_info("valid", evaluate_correct_predict, evaluate_total_loss)
+
+    # if epoch % 10 == 0:
+    #     evaluate_correct_predict, evaluate_total_loss = evaluate("valid")
+    #     print_info("valid", evaluate_correct_predict, evaluate_total_loss)
 
 

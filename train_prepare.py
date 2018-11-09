@@ -29,7 +29,7 @@ class CoDataSet(Dataset):
 
         self.paragraph_sentence_length_list = \
             [torch.Tensor([len(sent) for sent in para.sentence_list]
-                          * (MAX_SENTENCE_NUM_IN_PARAGRAPH // len(para.sentence_list))
+                          # * (MAX_SENTENCE_NUM_IN_PARAGRAPH // len(para.sentence_list))
                           # + [0 for _ in range(MAX_SENTENCE_NUM_IN_PARAGRAPH % len(para.sentence_list))]
                           ).int()
              for para in para_list]
@@ -51,13 +51,13 @@ class CoDataSet(Dataset):
                     para_tensor = torch.cat([para_tensor, sent_tensor.view(1, -1)])
 
             # proc extend
-            extend_times = MAX_SENTENCE_NUM_IN_PARAGRAPH // para_tensor.shape[0]
-            rest_space = MAX_SENTENCE_NUM_IN_PARAGRAPH % para_tensor.shape[0]
-            para_tensor_buff = para_tensor
-            for _ in range(extend_times - 1):
-                para_tensor = torch.cat([para_tensor, para_tensor_buff], 0)
-
-            # para_tensor = torch.cat([para_tensor, torch.zeros([rest_space, para_tensor.shape[1]]).long()], 0)
+            # extend_times = MAX_SENTENCE_NUM_IN_PARAGRAPH // para_tensor.shape[0]
+            # rest_space = MAX_SENTENCE_NUM_IN_PARAGRAPH % para_tensor.shape[0]
+            # para_tensor_buff = para_tensor
+            # for _ in range(extend_times - 1):
+            #     para_tensor = torch.cat([para_tensor, para_tensor_buff], 0)
+            #
+            # # para_tensor = torch.cat([para_tensor, torch.zeros([rest_space, para_tensor.shape[1]]).long()], 0)
 
             self.paragraph_tensor_list.append(para_tensor)
 
@@ -87,6 +87,6 @@ class CoDataSet(Dataset):
         rest = self.paragraph_num % batch_size
 
         for i in range(times):
-            yield self.paragraph_tensor_list[i: i+batch_size], \
-                  self.paragraph_sentence_length_list[i: i+batch_size], \
-                  torch.Tensor(self.paragraph_tag_list[i: i+batch_size]).long().cuda()
+            yield self.paragraph_tensor_list[i*(batch_size): (i+1)*batch_size], \
+                  self.paragraph_sentence_length_list[i*(batch_size): (i+1)*batch_size], \
+                  torch.Tensor(self.paragraph_tag_list[i*(batch_size): (i+1)*batch_size]).long().cuda()

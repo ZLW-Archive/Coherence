@@ -1,5 +1,10 @@
 import datetime
+import os
+import pickle
+import sys
+
 import numpy as np
+import argparse
 
 from keras import backend as K
 from keras import initializers
@@ -15,6 +20,28 @@ from scipy import stats
 
 from data_proc.read_proc_data import read_proc_data
 
+# Run Option
+parser = argparse.ArgumentParser()
+parser.add_argument("--verbose", type=int, default=1, choices=[1, 2])
+parser.add_argument("--batch_size", type=int, default=100)
+parser.add_argument("--file", type=bool, default=False)
+parser.add_argument("--directory", type=str, default="tmp")
+
+args = parser.parse_args()
+print(args)
+
+VERBOSE = args.verbose
+TO_FILE = args.file
+DIRECTORY = "checkpoint/{}".format(args.directory)
+
+if TO_FILE:
+    try:
+        os.makedirs(DIRECTORY)
+    except:
+        pass
+    output_file = open("{}/output.vstxt".format(DIRECTORY), "w", encoding="utf-8")
+    sys.stdout = output_file
+
 # parameter
 EMBEDDING_DIM = 300
 MAX_NB_WORDS = 4000
@@ -22,8 +49,9 @@ MAX_SEQUENCE_LENGTH = 500
 MAX_SENTENCE_NUM_IN_PARAGRAPH = 55
 DELTA = 20
 
-BATCH_SIZE = 100
+BATCH_SIZE = args.batch_size
 EPOCH = 1000
+
 
 class NeuralTensorLayer(Layer):
     def __init__(self, output_dim, input_dim=None, **kwargs):
@@ -68,6 +96,7 @@ class NeuralTensorLayer(Layer):
         batch_size = input_shape[0][0]
         return batch_size, self.output_dim
 
+
 class TemporalMeanPooling(Layer):  # conversion from (samples,timesteps,features) to (samples,features)
     def __init__(self, **kwargs):
         super(TemporalMeanPooling, self).__init__(**kwargs)
@@ -90,6 +119,7 @@ class TemporalMeanPooling(Layer):  # conversion from (samples,timesteps,features
     def compute_output_shape(self, input_shape):
         return input_shape[0], input_shape[2]
 
+
 class ReshapeLayer(Layer):
     def __init__(self, shape):
         super(ReshapeLayer, self).__init__()
@@ -104,6 +134,7 @@ class ReshapeLayer(Layer):
 
     # sp_sent = K.stack([K.stack([hidden_states[i, pos_re[i, j], :] for j in range(max_sent_num)])
     #                    for i in range(batch_size)])
+
 
 class SpecialStackLayer(Layer):
     def __init__(self, batch_size, max_sent_num, tensor_dim):
@@ -121,6 +152,7 @@ class SpecialStackLayer(Layer):
 
     def compute_output_shape(self, input_shape):
         return self.batch_size, self.max_sent_num, self.tensor_dim
+
 
 paragraph_raw_data = {
     "train": read_proc_data("train", para_wise=True, pos_need=True),
@@ -141,6 +173,7 @@ paragraph_num = {
     "train": len(paragraph_list["train"]),
     "valid": len(paragraph_list["valid"]),
 }
+
 
 def get_dataset(tag, shuffle=False):
     sequence = [para["paragraph"] for para in paragraph_list[tag]]
@@ -178,6 +211,7 @@ def get_dataset(tag, shuffle=False):
 
     return sequence, pos, tag_list
 
+
 def get_generator(tag, batch_size):
     para_num = paragraph_num[tag]
     while True:
@@ -213,6 +247,8 @@ side_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_m
                                  input_length=MAX_SEQUENCE_LENGTH,
                                  mask_zero=False,
                                  trainable=False)
+
+
 # third_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_matrix],
 #                                   input_length=MAX_SEQUENCE_LENGTH,
 #                                   mask_zero=False,
@@ -223,7 +259,7 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
              batch_size=BATCH_SIZE, max_len=MAX_SEQUENCE_LENGTH, max_sent_num=MAX_SENTENCE_NUM_IN_PARAGRAPH,
              seed=None):
     print("Start to Build Model ...")
-    e = Input(name="essay", shape=(max_len, ))
+    e = Input(name="essay", shape=(max_len,))
     # pos = Input(name="pos", shape=(max_sent_num, ), dtype="int32")
 
     embed = embedding_layer(e)
@@ -232,7 +268,7 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
 
     lstm_layer = Bidirectional(LSTM(lstm_dim, activation="relu", return_sequences=True))
 
-    hidden_states = ReshapeLayer((batch_size, max_len, 2*lstm_dim))(lstm_layer(embed))
+    hidden_states = ReshapeLayer((batch_size, max_len, 2 * lstm_dim))(lstm_layer(embed))
     side_hidden_states = lstm_layer(side_embed)
     # third_states = ReshapeLayer((batch_size, max_len, 2*lstm_dim))(lstm_layer(third_embed))
 
@@ -244,7 +280,7 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
     # sp_sent_mp = TemporalMeanPooling()(sp_sent)
 
     htm = TemporalMeanPooling()(hidden_states)
-    tensor_layer = NeuralTensorLayer(output_dim=k, input_dim=2*lstm_dim)
+    tensor_layer = NeuralTensorLayer(output_dim=k, input_dim=2 * lstm_dim)
     pairs = [((eta + i * delta) % max_len, (eta + i * delta + delta) % max_len) for i in range(max_len // delta)]
     hidden_pairs = [
         (Lambda(lambda t: t[:, p[0], :])(side_hidden_states),
@@ -272,19 +308,16 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
 
     return mod
 
+
 earlystopping = EarlyStopping(monitor='val_loss', patience=10)
 model = SkipFlow(lstm_dim=50, lr=2e-4, lr_decay=2e-6, k=4, eta=13, delta=50, activation="relu", seed=None)
 
-# hist = sf_1.fit(paragraph_dataset["train"][0], paragraph_dataset["train"][1], batch_size=1000, epochs=epochs,
-#                 validation_data=(paragraph_dataset["valid"][0], paragraph_dataset["valid"][1]),
-#                 callbacks=[earlystopping])
-#
-# # fit_generator(self, generator, steps_per_epoch, epochs=1, verbose=1, callbacks=None, validation_data=None,
-# #               validation_steps=None, class_weight=None, max_q_size=10, workers=1, pickle_safe=False, initial_epoch=0)
+train_log = model.fit_generator(paragraph_loader["train"], steps_per_epoch=paragraph_num["train"] // BATCH_SIZE,
+                                epochs=EPOCH, verbose=VERBOSE, callbacks=[earlystopping],
+                                validation_data=paragraph_loader["valid"],
+                                validation_steps=paragraph_num["valid"] // BATCH_SIZE)
 
-model.fit_generator(paragraph_loader["train"], steps_per_epoch=paragraph_num["train"] // BATCH_SIZE,
-                    epochs=EPOCH, verbose=1, callbacks=[earlystopping],
-                    validation_data=paragraph_loader["valid"],
-                    validation_steps=paragraph_num["valid"] // BATCH_SIZE)
+model.save("{}/saved_model.h5".format(DIRECTORY))
 
-model.save("saved_model_{}.h5".format(datetime.datetime.now().strftime('%b-%d-%Y-%H:%M:%S')))
+with open("{}/trainHistory".format(DIRECTORY), "w", encoding="utf-8") as file:
+    pickle.dump(train_log.history, file)

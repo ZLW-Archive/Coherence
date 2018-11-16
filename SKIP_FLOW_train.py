@@ -22,7 +22,7 @@ MAX_SEQUENCE_LENGTH = 500
 MAX_SENTENCE_NUM_IN_PARAGRAPH = 55
 DELTA = 20
 
-BATCH_SIZE = 20
+BATCH_SIZE = 100
 EPOCH = 1000
 
 class NeuralTensorLayer(Layer):
@@ -122,7 +122,6 @@ class SpecialStackLayer(Layer):
     def compute_output_shape(self, input_shape):
         return self.batch_size, self.max_sent_num, self.tensor_dim
 
-
 paragraph_raw_data = {
     "train": read_proc_data("train", para_wise=True, pos_need=True),
     "valid": read_proc_data("valid", para_wise=True, pos_need=True),
@@ -184,8 +183,10 @@ def get_generator(tag, batch_size):
     while True:
         times = para_num // batch_size
         for i in range(times):
-            yield [paragraph_dataset[tag][0][i * (batch_size): (i + 1) * batch_size],
-                   paragraph_dataset[tag][1][i * (batch_size): (i + 1) * batch_size]], \
+            # yield [paragraph_dataset[tag][0][i * (batch_size): (i + 1) * batch_size],
+            #        paragraph_dataset[tag][1][i * (batch_size): (i + 1) * batch_size]], \
+            #       paragraph_dataset[tag][2][i * (batch_size): (i + 1) * batch_size]
+            yield paragraph_dataset[tag][0][i * (batch_size): (i + 1) * batch_size], \
                   paragraph_dataset[tag][2][i * (batch_size): (i + 1) * batch_size]
 
 
@@ -223,7 +224,7 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
              seed=None):
     print("Start to Build Model ...")
     e = Input(name="essay", shape=(max_len, ))
-    pos = Input(name="pos", shape=(max_sent_num, ), dtype="int32")
+    # pos = Input(name="pos", shape=(max_sent_num, ), dtype="int32")
 
     embed = embedding_layer(e)
     side_embed = side_embedding_layer(e)
@@ -237,12 +238,12 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
 
     # sent_lstm_layer = LSTM(lstm_dim, return_sequences=False)
 
-    pos_re = ReshapeLayer((batch_size, max_sent_num))(pos)
-    sp_sent = SpecialStackLayer(batch_size, max_sent_num, 2*lstm_dim)([hidden_states, pos_re])
-    # sp_sent_lstm = sent_lstm_layer(sp_sent)
-    sp_sent_mp = TemporalMeanPooling()(sp_sent)
+    # pos_re = ReshapeLayer((batch_size, max_sent_num))(pos)
+    # sp_sent = SpecialStackLayer(batch_size, max_sent_num, 2*lstm_dim)([hidden_states, pos_re])
+    # # sp_sent_lstm = sent_lstm_layer(sp_sent)
+    # sp_sent_mp = TemporalMeanPooling()(sp_sent)
 
-    # htm = TemporalMeanPooling()(hidden_states)
+    htm = TemporalMeanPooling()(hidden_states)
     tensor_layer = NeuralTensorLayer(output_dim=k, input_dim=2*lstm_dim)
     pairs = [((eta + i * delta) % max_len, (eta + i * delta + delta) % max_len) for i in range(max_len // delta)]
     hidden_pairs = [
@@ -252,8 +253,8 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
     sigmoid_dense = Dense(1, activation="sigmoid", kernel_initializer=initializers.glorot_normal(seed=seed))
     coherence = [ReshapeLayer((batch_size, 1))(sigmoid_dense(tensor_layer([hp[0], hp[1]]))) for hp in hidden_pairs]
     # co_tm = Concatenate()(coherence + [htm] + [sp_sent_lstm])
-    # co_tm = Concatenate()(coherence + [htm] + [sp_sent_mp])
-    co_tm = Concatenate()(coherence + [sp_sent_mp])
+    co_tm = Concatenate()(coherence + [htm])
+    # co_tm = Concatenate()(coherence + [sp_sent_mp])
 
     dense = Dense(256, activation=activation, kernel_initializer=initializers.glorot_normal(seed=seed))(co_tm)
     dense = Dropout(0.5, seed=seed)(dense)
@@ -262,7 +263,8 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
     dense = Dense(64, activation=activation, kernel_initializer=initializers.glorot_normal(seed=seed))(dense)
 
     out = Dense(2, activation="sigmoid")(dense)
-    mod = Model(inputs=[e, pos], outputs=[out])
+    mod = Model(inputs=e, outputs=out)
+    # mod = Model(inputs=[e, pos], outputs=[out])
     adam = Adam(lr=lr, decay=lr_decay)
     mod.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
 

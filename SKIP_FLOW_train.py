@@ -154,6 +154,10 @@ def get_dataset(tag, shuffle=False):
     pos = paragraph_pos[tag]
     # sent_num = [len(p) for p in pos]
     # sent_num = np.asarray(sent_num, dtype=np.int)
+    for i in range(len(pos)):
+        for j in range(len(pos[i])):
+            if pos[i][j] >= MAX_SEQUENCE_LENGTH:
+                pos[i][j] = -1
     pos = pad_sequences(pos, maxlen=MAX_SENTENCE_NUM_IN_PARAGRAPH, padding='post', value=-1)
     # pos_mat_total = []
     # for p in pos:
@@ -275,7 +279,7 @@ model = SkipFlow(lstm_dim=50, lr=2e-4, lr_decay=2e-6, k=4, eta=13, delta=50, act
 # #               validation_steps=None, class_weight=None, max_q_size=10, workers=1, pickle_safe=False, initial_epoch=0)
 
 model.fit_generator(paragraph_loader["train"], steps_per_epoch=paragraph_num["train"] // BATCH_SIZE,
-                    epochs=EPOCH, verbose=2, callbacks=[earlystopping],
+                    epochs=EPOCH, verbose=1, callbacks=[earlystopping],
                     validation_data=paragraph_loader["valid"],
                     validation_steps=paragraph_num["valid"] // BATCH_SIZE)
 

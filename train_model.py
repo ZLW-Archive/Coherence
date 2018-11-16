@@ -309,7 +309,7 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
     return mod
 
 
-earlystopping = EarlyStopping(monitor='val_loss', patience=10)
+earlystopping = EarlyStopping(monitor='val_loss', patience=5)
 model = SkipFlow(lstm_dim=50, lr=2e-4, lr_decay=2e-6, k=4, eta=13, delta=50, activation="relu", seed=None)
 
 train_log = model.fit_generator(paragraph_loader["train"], steps_per_epoch=paragraph_num["train"] // BATCH_SIZE,

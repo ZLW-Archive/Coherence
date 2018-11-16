@@ -212,10 +212,10 @@ side_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_m
                                  input_length=MAX_SEQUENCE_LENGTH,
                                  mask_zero=False,
                                  trainable=False)
-third_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_matrix],
-                                  input_length=MAX_SEQUENCE_LENGTH,
-                                  mask_zero=False,
-                                  trainable=False)
+# third_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_matrix],
+#                                   input_length=MAX_SEQUENCE_LENGTH,
+#                                   mask_zero=False,
+#                                   trainable=False)
 
 
 def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activation="relu",
@@ -227,26 +227,22 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
 
     embed = embedding_layer(e)
     side_embed = side_embedding_layer(e)
-    third_embed = third_embedding_layer(e)
+    # third_embed = third_embedding_layer(e)
 
     lstm_layer = Bidirectional(LSTM(lstm_dim, activation="relu", return_sequences=True))
 
     hidden_states = ReshapeLayer((batch_size, max_len, 2*lstm_dim))(lstm_layer(embed))
     side_hidden_states = lstm_layer(side_embed)
-    third_states = ReshapeLayer((batch_size, max_len, 2*lstm_dim))(lstm_layer(third_embed))
+    # third_states = ReshapeLayer((batch_size, max_len, 2*lstm_dim))(lstm_layer(third_embed))
 
-    sent_lstm_layer = LSTM(lstm_dim, return_sequences=False)
-
-    # sp_sent = []
-    # for j in range(max_sent_num):
-    #     sp_sent.append(hidden_states[pos[j], :])
-    # sp_sent = K.stack(sp_sent)
+    # sent_lstm_layer = LSTM(lstm_dim, return_sequences=False)
 
     pos_re = ReshapeLayer((batch_size, max_sent_num))(pos)
-    sp_sent = SpecialStackLayer(batch_size, max_sent_num, 2*lstm_dim)([third_states, pos_re])
-    sp_sent_lstm = sent_lstm_layer(sp_sent)
+    sp_sent = SpecialStackLayer(batch_size, max_sent_num, 2*lstm_dim)([hidden_states, pos_re])
+    # sp_sent_lstm = sent_lstm_layer(sp_sent)
+    sp_sent_mp = TemporalMeanPooling()(sp_sent)
 
-    htm = TemporalMeanPooling()(hidden_states)
+    # htm = TemporalMeanPooling()(hidden_states)
     tensor_layer = NeuralTensorLayer(output_dim=k, input_dim=2*lstm_dim)
     pairs = [((eta + i * delta) % max_len, (eta + i * delta + delta) % max_len) for i in range(max_len // delta)]
     hidden_pairs = [
@@ -255,7 +251,9 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
         for p in pairs]
     sigmoid_dense = Dense(1, activation="sigmoid", kernel_initializer=initializers.glorot_normal(seed=seed))
     coherence = [ReshapeLayer((batch_size, 1))(sigmoid_dense(tensor_layer([hp[0], hp[1]]))) for hp in hidden_pairs]
-    co_tm = Concatenate()(coherence + [htm] + [sp_sent_lstm])
+    # co_tm = Concatenate()(coherence + [htm] + [sp_sent_lstm])
+    # co_tm = Concatenate()(coherence + [htm] + [sp_sent_mp])
+    co_tm = Concatenate()(coherence + [sp_sent_mp])
 
     dense = Dense(256, activation=activation, kernel_initializer=initializers.glorot_normal(seed=seed))(co_tm)
     dense = Dropout(0.5, seed=seed)(dense)

@@ -316,5 +316,5 @@ train_log = model.fit_generator(paragraph_loader["train"], steps_per_epoch=parag
 
 model.save_weights("{}/saved_model_weight.h5".format(DIRECTORY))
 
-with open("{}/trainHistory".format(DIRECTORY), "w", encoding="utf-8") as file:
+with open("{}/trainHistory".format(DIRECTORY), "wb") as file:
     pickle.dump(train_log.history, file)

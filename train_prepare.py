@@ -63,7 +63,7 @@ class CoDataSet(Dataset):
 
             self.paragraph_tensor_list.append(para_tensor)
 
-        self.make_cuda()
+        # self.make_cuda()
 
         if shuffle:
             ZIP_LIST = list(zip(self.paragraph_tensor_list,
@@ -92,4 +92,4 @@ class CoDataSet(Dataset):
         for i in range(times):
             yield self.paragraph_tensor_list[i * (batch_size): (i + 1) * batch_size], \
                   self.paragraph_sentence_length_list[i * (batch_size): (i + 1) * batch_size], \
-                  torch.Tensor(self.paragraph_tag_list[i * (batch_size): (i + 1) * batch_size]).long().cuda()
+                  torch.Tensor(self.paragraph_tag_list[i * (batch_size): (i + 1) * batch_size]).long()

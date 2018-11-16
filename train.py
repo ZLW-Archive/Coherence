@@ -61,6 +61,11 @@ def train():
     for batch_times, (paragraph_batch, sentence_length_batch, tag_batch) \
             in enumerate(paragraph_dataset["train"].loader(batch_size)):
 
+        for i in range(batch_size):
+            paragraph_batch[i] = paragraph_batch[i].cuda()
+            sentence_length_batch[i] = sentence_length_batch[i].cuda()
+            tag_batch[i] = tag_batch[i].cuda()
+
         optimizer.zero_grad()
 
         score_batch = model(paragraph_batch, sentence_length_batch)

@@ -20,7 +20,7 @@ from data_proc.read_proc_data import read_proc_data
 # Run Option
 parser = argparse.ArgumentParser()
 parser.add_argument("--verbose", type=int, default=1, choices=[1, 2])
-parser.add_argument("--batch_size", type=int, default=20)
+parser.add_argument("--batch_size", type=int, default=100)
 parser.add_argument("--file", type=bool, default=False)
 parser.add_argument("--directory", type=str, default="tmp")
 
@@ -214,11 +214,11 @@ def get_generator(tag, batch_size):
     while True:
         times = para_num // batch_size
         for i in range(times):
-            yield [paragraph_dataset[tag][0][i * (batch_size): (i + 1) * batch_size],
-                   paragraph_dataset[tag][1][i * (batch_size): (i + 1) * batch_size]], \
-                  paragraph_dataset[tag][2][i * (batch_size): (i + 1) * batch_size]
-            # yield paragraph_dataset[tag][0][i * (batch_size): (i + 1) * batch_size], \
+            # yield [paragraph_dataset[tag][0][i * (batch_size): (i + 1) * batch_size],
+            #        paragraph_dataset[tag][1][i * (batch_size): (i + 1) * batch_size]], \
             #       paragraph_dataset[tag][2][i * (batch_size): (i + 1) * batch_size]
+            yield paragraph_dataset[tag][0][i * (batch_size): (i + 1) * batch_size], \
+                  paragraph_dataset[tag][2][i * (batch_size): (i + 1) * batch_size]
 
 
 paragraph_dataset = {
@@ -246,10 +246,10 @@ side_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_m
                                  trainable=False)
 
 
-third_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_matrix],
-                                  input_length=MAX_SEQUENCE_LENGTH,
-                                  mask_zero=False,
-                                  trainable=False)
+# third_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_matrix],
+#                                   input_length=MAX_SEQUENCE_LENGTH,
+#                                   mask_zero=False,
+#                                   trainable=False)
 
 
 # def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activation="relu",

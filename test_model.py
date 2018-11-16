@@ -10,8 +10,9 @@ from scipy import stats
 
 from data_proc.read_proc_data import read_proc_data
 
-MODEL_PATH = "model.h5"
-SAVE_PATH = ""
+TAG = "tmp"
+MODEL_PATH = "checkpoint/{}/saved_model_weight.h5".format(TAG)
+SAVE_PATH = "checkpoint/{}/test_result.txt".format(TAG)
 
 BATCH_SIZE = 100
 EMBEDDING_DIM = 300
@@ -241,8 +242,8 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
 
     return mod
 
-model = OldModel(lstm_dim=50, lr=2e-4, lr_decay=2e-6, k=4, eta=13, delta=50, activation="relu", seed=None)
-# model = SkipFlow(lstm_dim=50, lr=2e-4, lr_decay=2e-6, k=4, eta=13, delta=50, activation="relu", seed=None)
+# model = OldModel(lstm_dim=50, lr=2e-4, lr_decay=2e-6, k=4, eta=13, delta=50, activation="relu", seed=None)
+model = SkipFlow(lstm_dim=50, lr=2e-4, lr_decay=2e-6, k=4, eta=13, delta=50, activation="relu", seed=None)
 
 model.load_weights(MODEL_PATH)
 

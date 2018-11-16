@@ -20,7 +20,7 @@ from data_proc.read_proc_data import read_proc_data
 # Run Option
 parser = argparse.ArgumentParser()
 parser.add_argument("--verbose", type=int, default=1, choices=[1, 2])
-parser.add_argument("--batch_size", type=int, default=100)
+parser.add_argument("--batch_size", type=int, default=20)
 parser.add_argument("--file", type=bool, default=False)
 parser.add_argument("--directory", type=str, default="tmp")
 
@@ -214,11 +214,11 @@ def get_generator(tag, batch_size):
     while True:
         times = para_num // batch_size
         for i in range(times):
-            # yield [paragraph_dataset[tag][0][i * (batch_size): (i + 1) * batch_size],
-            #        paragraph_dataset[tag][1][i * (batch_size): (i + 1) * batch_size]], \
-            #       paragraph_dataset[tag][2][i * (batch_size): (i + 1) * batch_size]
-            yield paragraph_dataset[tag][0][i * (batch_size): (i + 1) * batch_size], \
+            yield [paragraph_dataset[tag][0][i * (batch_size): (i + 1) * batch_size],
+                   paragraph_dataset[tag][1][i * (batch_size): (i + 1) * batch_size]], \
                   paragraph_dataset[tag][2][i * (batch_size): (i + 1) * batch_size]
+            # yield paragraph_dataset[tag][0][i * (batch_size): (i + 1) * batch_size], \
+            #       paragraph_dataset[tag][2][i * (batch_size): (i + 1) * batch_size]
 
 
 paragraph_dataset = {
@@ -246,10 +246,10 @@ side_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_m
                                  trainable=False)
 
 
-# third_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_matrix],
-#                                   input_length=MAX_SEQUENCE_LENGTH,
-#                                   mask_zero=False,
-#                                   trainable=False)
+third_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_matrix],
+                                  input_length=MAX_SEQUENCE_LENGTH,
+                                  mask_zero=False,
+                                  trainable=False)
 
 
 def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activation="relu",
@@ -257,23 +257,23 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
              seed=None):
     print("Start to Build Model ...")
     e = Input(name="essay", shape=(max_len,))
-    # pos = Input(name="pos", shape=(max_sent_num, ), dtype="int32")
+    pos = Input(name="pos", shape=(max_sent_num, ), dtype="int32")
 
     embed = embedding_layer(e)
     side_embed = side_embedding_layer(e)
-    # third_embed = third_embedding_layer(e)
+    third_embed = third_embedding_layer(e)
 
     lstm_layer = Bidirectional(LSTM(lstm_dim, activation="relu", return_sequences=True))
 
     hidden_states = ReshapeLayer((batch_size, max_len, 2 * lstm_dim))(lstm_layer(embed))
     side_hidden_states = lstm_layer(side_embed)
-    # third_states = ReshapeLayer((batch_size, max_len, 2*lstm_dim))(lstm_layer(third_embed))
+    third_states = ReshapeLayer((batch_size, max_len, 2*lstm_dim))(lstm_layer(third_embed))
 
-    # sent_lstm_layer = LSTM(lstm_dim, return_sequences=False)
+    sent_lstm_layer = LSTM(lstm_dim, return_sequences=False)
 
-    # pos_re = ReshapeLayer((batch_size, max_sent_num))(pos)
-    # sp_sent = SpecialStackLayer(batch_size, max_sent_num, 2*lstm_dim)([hidden_states, pos_re])
-    # # sp_sent_lstm = sent_lstm_layer(sp_sent)
+    pos_re = ReshapeLayer((batch_size, max_sent_num))(pos)
+    sp_sent = SpecialStackLayer(batch_size, max_sent_num, 2*lstm_dim)([third_states, pos_re])
+    sp_sent_lstm = sent_lstm_layer(sp_sent)
     # sp_sent_mp = TemporalMeanPooling()(sp_sent)
 
     htm = TemporalMeanPooling()(hidden_states)
@@ -285,8 +285,8 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
         for p in pairs]
     sigmoid_dense = Dense(1, activation="sigmoid", kernel_initializer=initializers.glorot_normal(seed=seed))
     coherence = [ReshapeLayer((batch_size, 1))(sigmoid_dense(tensor_layer([hp[0], hp[1]]))) for hp in hidden_pairs]
-    # co_tm = Concatenate()(coherence + [htm] + [sp_sent_lstm])
-    co_tm = Concatenate()(coherence + [htm])
+    co_tm = Concatenate()(coherence + [htm] + [sp_sent_lstm])
+    # co_tm = Concatenate()(coherence + [htm])
     # co_tm = Concatenate()(coherence + [sp_sent_mp])
 
     dense = Dense(256, activation=activation, kernel_initializer=initializers.glorot_normal(seed=seed))(co_tm)
@@ -296,8 +296,8 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
     dense = Dense(64, activation=activation, kernel_initializer=initializers.glorot_normal(seed=seed))(dense)
 
     out = Dense(2, activation="sigmoid")(dense)
-    mod = Model(inputs=e, outputs=out)
-    # mod = Model(inputs=[e, pos], outputs=[out])
+    # mod = Model(inputs=e, outputs=out)
+    mod = Model(inputs=[e, pos], outputs=[out])
     adam = Adam(lr=lr, decay=lr_decay)
     mod.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
 

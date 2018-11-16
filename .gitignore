@@ -2,6 +2,7 @@
 *.pyc
 *.txt
 *.zip
+*.h5
 .idea/
 data/
 data_ori/

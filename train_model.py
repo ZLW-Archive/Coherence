@@ -1,17 +1,14 @@
-import datetime
+import argparse
 import os
 import pickle
 import sys
 
 import numpy as np
-import argparse
-
 from keras import backend as K
 from keras import initializers
 from keras.callbacks import EarlyStopping
 from keras.engine.topology import Layer, InputSpec
-from keras.layers import Dense, LSTM, Input, Embedding, Concatenate, Lambda, Dropout, GRU, Bidirectional, Reshape
-
+from keras.layers import Dense, LSTM, Input, Embedding, Concatenate, Lambda, Dropout, Bidirectional
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.preprocessing.sequence import pad_sequences
@@ -317,7 +314,7 @@ train_log = model.fit_generator(paragraph_loader["train"], steps_per_epoch=parag
                                 validation_data=paragraph_loader["valid"],
                                 validation_steps=paragraph_num["valid"] // BATCH_SIZE)
 
-model.save("{}/saved_model.h5".format(DIRECTORY))
+model.save_weights("{}/saved_model_weight.h5".format(DIRECTORY))
 
 with open("{}/trainHistory".format(DIRECTORY), "w", encoding="utf-8") as file:
     pickle.dump(train_log.history, file)

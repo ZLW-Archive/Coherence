@@ -11,6 +11,7 @@ from scipy import stats
 from data_proc.read_proc_data import read_proc_data
 
 MODEL_PATH = "model.h5"
+SAVE_PATH = ""
 
 BATCH_SIZE = 100
 EMBEDDING_DIM = 300
@@ -254,7 +255,7 @@ for i in range(pred.shape[0]):
         pred_result.append(0)
     else:
         pred_result.append(1)
-file = open("test_result.txt", "w", encoding="utf-8")
+file = open(SAVE_PATH, "w", encoding="utf-8")
 for p in pred_result:
     file.write("{}\n".format(p))
 

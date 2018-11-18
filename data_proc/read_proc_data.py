@@ -15,8 +15,6 @@ def read_proc_data(source, para_wise=False, pos_need=False, order=False):
     file = open(file_path, "r", encoding="utf-8")
     para_num = int(file.readline())
 
-    para_category = [[], []]
-
     para_list = []
 
     for _ in tqdm(range(para_num), desc="{} reading".format(source)):

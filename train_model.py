@@ -174,10 +174,11 @@ paragraph_num = {
 
 def get_dataset(tag, shuffle=False):
     sequence = [para["paragraph"] for para in paragraph_list[tag]]
-    sequence = pad_sequences(sequence, maxlen=MAX_SEQUENCE_LENGTH, padding='post')
+    sequence = pad_sequences(sequence, maxlen=MAX_SEQUENCE_LENGTH, truncating='post')
 
     tag_list = [para["tag"] for para in paragraph_list[tag]]
     tag_list = np.asarray(tag_list)
+    tmp = tag_list
     tag_list = np_utils.to_categorical(tag_list)
 
     pos = paragraph_pos[tag]
@@ -238,72 +239,13 @@ vocab_size = embedding_matrix.shape[0]
 
 embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_matrix],
                             input_length=MAX_SEQUENCE_LENGTH,
-                            mask_zero=False,
+                            mask_zero=True,
                             trainable=False)
 side_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_matrix],
                                  input_length=MAX_SEQUENCE_LENGTH,
                                  mask_zero=False,
                                  trainable=False)
 
-
-# third_embedding_layer = Embedding(vocab_size, EMBEDDING_DIM, weights=[embedding_matrix],
-#                                   input_length=MAX_SEQUENCE_LENGTH,
-#                                   mask_zero=False,
-#                                   trainable=False)
-
-
-# def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activation="relu",
-#              batch_size=BATCH_SIZE, max_len=MAX_SEQUENCE_LENGTH, max_sent_num=MAX_SENTENCE_NUM_IN_PARAGRAPH,
-#              seed=None):
-#     print("Start to Build Model ...")
-#     e = Input(name="essay", shape=(max_len,))
-#     pos = Input(name="pos", shape=(max_sent_num, ), dtype="int32")
-#
-#     embed = embedding_layer(e)
-#     side_embed = side_embedding_layer(e)
-#     third_embed = third_embedding_layer(e)
-#
-#     lstm_layer = Bidirectional(LSTM(lstm_dim, activation="relu", return_sequences=True))
-#
-#     hidden_states = ReshapeLayer((batch_size, max_len, 2 * lstm_dim))(lstm_layer(embed))
-#     side_hidden_states = lstm_layer(side_embed)
-#     third_states = ReshapeLayer((batch_size, max_len, 2*lstm_dim))(lstm_layer(third_embed))
-#
-#     sent_lstm_layer = LSTM(lstm_dim, return_sequences=False)
-#
-#     pos_re = ReshapeLayer((batch_size, max_sent_num))(pos)
-#     sp_sent = SpecialStackLayer(batch_size, max_sent_num, 2*lstm_dim)([third_states, pos_re])
-#     sp_sent_lstm = sent_lstm_layer(sp_sent)
-#     # sp_sent_mp = TemporalMeanPooling()(sp_sent)
-#
-#     htm = TemporalMeanPooling()(hidden_states)
-#     tensor_layer = NeuralTensorLayer(output_dim=k, input_dim=2 * lstm_dim)
-#     pairs = [((eta + i * delta) % max_len, (eta + i * delta + delta) % max_len) for i in range(max_len // delta)]
-#     hidden_pairs = [
-#         (Lambda(lambda t: t[:, p[0], :])(side_hidden_states),
-#          Lambda(lambda t: t[:, p[1], :])(side_hidden_states))
-#         for p in pairs]
-#     sigmoid_dense = Dense(1, activation="sigmoid", kernel_initializer=initializers.glorot_normal(seed=seed))
-#     coherence = [ReshapeLayer((batch_size, 1))(sigmoid_dense(tensor_layer([hp[0], hp[1]]))) for hp in hidden_pairs]
-#     co_tm = Concatenate()(coherence + [htm] + [sp_sent_lstm])
-#     # co_tm = Concatenate()(coherence + [htm])
-#     # co_tm = Concatenate()(coherence + [sp_sent_mp])
-#
-#     dense = Dense(256, activation=activation, kernel_initializer=initializers.glorot_normal(seed=seed))(co_tm)
-#     dense = Dropout(0.5, seed=seed)(dense)
-#     dense = Dense(128, activation=activation, kernel_initializer=initializers.glorot_normal(seed=seed))(dense)
-#     dense = Dropout(0.5, seed=seed)(dense)
-#     dense = Dense(64, activation=activation, kernel_initializer=initializers.glorot_normal(seed=seed))(dense)
-#
-#     out = Dense(2, activation="sigmoid")(dense)
-#     # mod = Model(inputs=e, outputs=out)
-#     mod = Model(inputs=[e, pos], outputs=[out])
-#     adam = Adam(lr=lr, decay=lr_decay)
-#     mod.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
-#
-#     print("Finish Building Model ...")
-#
-#     return mod
 
 def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activation="relu", maxlen=MAX_SEQUENCE_LENGTH,
              dropout=0.5, seed=None):
@@ -324,9 +266,9 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
     co_tm = Concatenate()(coherence[:] + [htm])
 
     dense = Dense(256, activation=activation, kernel_initializer=initializers.glorot_normal(seed=seed))(co_tm)
-    dense = Dropout(dropout)(dense)
+    # dense = Dropout(dropout)(dense)
     dense = Dense(128, activation=activation, kernel_initializer=initializers.glorot_normal(seed=seed))(dense)
-    dense = Dropout(dropout)(dense)
+    # dense = Dropout(dropout)(dense)
     dense = Dense(64, activation=activation, kernel_initializer=initializers.glorot_normal(seed=seed))(dense)
 
     out = Dense(2, activation="sigmoid")(dense)
@@ -335,13 +277,16 @@ def SkipFlow(lstm_dim=50, lr=1e-4, lr_decay=1e-6, k=5, eta=3, delta=50, activati
     mod.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
     return mod
 
-earlystopping = EarlyStopping(monitor='val_loss', patience=5)
+earlystopping = EarlyStopping(monitor='val_loss', patience=3)
 model = SkipFlow(lstm_dim=50, lr=2e-4, lr_decay=2e-6, k=4, eta=13, delta=50, activation="relu", seed=None)
 
-train_log = model.fit_generator(paragraph_loader["train"], steps_per_epoch=paragraph_num["train"] // BATCH_SIZE,
-                                epochs=EPOCH, verbose=VERBOSE, callbacks=[earlystopping],
-                                validation_data=paragraph_loader["valid"],
-                                validation_steps=paragraph_num["valid"] // BATCH_SIZE)
+try:
+    train_log = model.fit_generator(paragraph_loader["train"], steps_per_epoch=paragraph_num["train"] // BATCH_SIZE,
+                                    epochs=EPOCH, verbose=VERBOSE, callbacks=[earlystopping],
+                                    validation_data=paragraph_loader["valid"],
+                                    validation_steps=paragraph_num["valid"] // BATCH_SIZE)
+except:
+    pass
 
 model.save_weights("{}/saved_model_weight.h5".format(DIRECTORY))
 
